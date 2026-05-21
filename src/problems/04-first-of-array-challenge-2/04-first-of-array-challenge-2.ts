@@ -18,7 +18,7 @@ import type { Equal, Expect } from '@course/types'
 
 /* _____________ Your Code Here _____________ */
 
-type First = {};
+type First<T extends any[]> = T extends [infer F, ...any[]] ? F : never;
 
 /* _____________ Test Cases _____________ */
 
