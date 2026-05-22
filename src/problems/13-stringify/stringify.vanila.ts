@@ -22,22 +22,42 @@ import { detectType } from '@course/utils'
  * - circular:  (ref to self)    → '[Circular]'
  * - other:     unknown type     → '"Unsupported Type"'
  */
-export const stringify = (a: any, cache = new Set()) => {
+export const stringify = (a: any, cache = new WeakSet<object>()): string => {
   const type = detectType(a)
   switch (type) {
     case 'null':
     case 'number':
     case 'bigint':
     case 'boolean':
+      return `${a}`
     case 'symbol':
+      return `"${String(a)}"`
     case 'undefined':
     case 'string':
-    case 'object':
+      return `"${a}"`
     case 'map':
+    case 'object': {
+      if (cache.has(a)) return '[Circular]'
+      cache.add(a)
+      const entries = a instanceof Map ? a.entries() : Object.entries(a)
+      const content = Array.from(entries)
+        .map(([key, value]) => `${key}: ${stringify(value, cache)}`)
+        .join(', ')
+      return `{ ${content} }`
+    }
     case 'array':
-    case 'set':
+    case 'set': {
+      if (cache.has(a)) return '[Circular]'
+      cache.add(a)
+      const content = Array.from(a)
+        .map((value) => stringify(value, cache))
+        .join(',')
+      return `[${content}]`
+    }
     case 'date':
+      return (a as Date).toLocaleString()
     case 'regexp':
+      return (a as RegExp).toString()
     default:
       return '"Unsupported Type"'
   }

@@ -18,6 +18,9 @@ import type { Equal, Expect } from '@course/types'
 /* _____________ Your Code Here _____________ */
 
 // Your implementation here
+type MyReadonly<T> = {
+  readonly [K in keyof T]: T[K]
+}
 
 /* _____________ Test Cases _____________ */
 

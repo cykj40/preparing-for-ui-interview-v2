@@ -1,16 +1,49 @@
 // bun test src/problems/10-deep-clone/test/deep-clone.test.ts
-// TODO: Implement deepClone
 
 import { detectType } from '@course/utils'
 
 type TCollection = Map<any, any> | Set<any> | Record<any, any> | Array<any>
 
-function getTarget(type: string): TCollection {}
-function entries(target: TCollection): Iterable<[key: any, value: any]> {
-function set(target: TCollection, key: any, value: any) {}
+function getTarget(type: string): TCollection {
+  switch (type) {
+    case 'map':
+      return new Map()
+    case 'set':
+      return new Set()
+    case 'object':
+      return {}
+    case 'array':
+      return []
+    default:
+      throw new Error('Unknown collection type')
+  }
+}
 
-export const deepClone = <T>(a: T, cache = new Map()): T => {
+function entries(target: TCollection): Iterable<[key: any, value: any]> {
+  if (target instanceof Map || target instanceof Set || target instanceof Array) {
+    return target.entries()
+  }
+  return Object.entries(target)
+}
+
+function set(target: TCollection, key: any, value: any) {
+  if (target instanceof Map) {
+    target.set(key, value)
+  } else if (target instanceof Set) {
+    target.add(value)
+  } else if (target instanceof Array) {
+    target[key as number] = value
+  } else {
+    target[key] = value
+  }
+}
+
+export function deepClone<T>(a: T, cache = new Map<any, any>()): T {
   const type = detectType(a)
+
+  if (cache.has(a as object)) {
+    return cache.get(a as object)
+  }
 
   if (!a || typeof a !== 'object') {
     return a
@@ -18,12 +51,20 @@ export const deepClone = <T>(a: T, cache = new Map()): T => {
 
   switch (type) {
     case 'date':
+      return new Date((a as unknown as Date).getTime()) as T
     case 'object':
     case 'map':
     case 'set':
-    case 'array':
+    case 'array': {
+      const target = getTarget(type)
+      cache.set(a as object, target)
+      for (const [key, value] of entries(a as TCollection)) {
+        set(target, key, deepClone(value, cache))
+      }
+      return target as T
+    }
     default:
-      throw 'Unsupported type ' + a
+      return a
   }
 }
 
