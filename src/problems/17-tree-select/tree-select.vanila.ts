@@ -14,7 +14,29 @@ class TreeNode {
   constructor(
     public name: string,
     public parent: TreeNode | null = null,
-  ) {}
+  ) { }
+
+  addChild(node: TreeNode): void {
+    node.parent = this
+    this.children.push(node)
+  }
+
+  getSelectedCount(): number {
+    return this.children.reduce((acc, node) => acc + (node.status === SELECTED ? 1 : 0), 0)
+  }
+
+  updateStatus(): void {
+    const selectedCount = this.getSelectedCount()
+    const hasPartialChild = this.children.some((c) => c.status === PARTIAL)
+
+    if (selectedCount === this.children.length && !hasPartialChild) {
+      this.status = SELECTED
+    } else if (selectedCount === 0 && !hasPartialChild) {
+      this.status = NOT_SELECTED
+    } else {
+      this.status = PARTIAL
+    }
+  }
 
   toString(level: number = -1): string {
     const dots = Math.max(0, level)
@@ -24,23 +46,67 @@ class TreeNode {
 }
 
 // Step 1: Implement createTree
-function createTree(paths: string[]): [TreeNode, Map<string, TreeNode>] {}
+function createTree(paths: string[]): [TreeNode, Map<string, TreeNode>] {
+  const root = new TreeNode('')
+  const store = new Map<string, TreeNode>()
+  for (const path of paths) {
+    const tokens = path.split('/')
+    let current = root
+
+    for (const token of tokens) {
+      if (!store.has(token)) {
+        const node = new TreeNode(token, current)
+        store.set(token, node)
+        current.addChild(node)
+      }
+      current = store.get(token)!
+    }
+  }
+  return [root, store]
+}
 //   - Create a root TreeNode and a Map<string, TreeNode> store
 //   - For each path, split by '/' into tokens
 //   - For each token, check if it exists in the store; if not, create a new TreeNode and addChild to parent
 //   - Return [root, store]
 
 // Step 2: Implement bubble
-function* bubble(node: TreeNode): Iterable<TreeNode> {}
+function* bubble(node: TreeNode): Iterable<TreeNode> {
+  if (node.parent != null) {
+    yield node.parent
+    yield* bubble(node.parent)
+  }
+}
 
 // Step 3: Implement propagate
-function* propagate(node: TreeNode): Iterable<TreeNode> {}
+function* propagate(node: TreeNode): Iterable<TreeNode> {
+  if (node == null) {
+    return
+  }
+  for (const ch of node.children) {
+    yield ch
+    yield* propagate(ch)
+  }
+}
 // Step 4: Implement renderTreeSelect
 //   - Call createTree to build the tree
 //   - For each click: toggle the clicked node's status, propagate to descendants, bubble up to update ancestors
 //   - Return root.toString()
 
-export const renderTreeSelect = (paths: string[], clicks: string[]): string => {}
+export const renderTreeSelect = (paths: string[], clicks: string[]): string => {
+  const [root, store] = createTree(paths)
+  for (const click of clicks) {
+    const node = store.get(click)
+    if (node == null) continue
+    node.status = node.status !== NOT_SELECTED ? NOT_SELECTED : SELECTED
+    for (const next of propagate(node)) {
+      next.status = node.status
+    }
+    for (const next of bubble(node)) {
+      next.updateStatus()
+    }
+  }
+  return root.toString()
+}
 
 // --- Examples ---
 // Uncomment to test your implementation:
