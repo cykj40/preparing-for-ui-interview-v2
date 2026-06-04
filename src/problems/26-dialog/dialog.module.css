@@ -1,7 +1,11 @@
 /* Backdrop: semi-transparent overlay with blur */
 .container::backdrop {
+  background-color: rgba(0, 0, 0, 0.2);
+  filter: blur(6px);
 }
 
 /* Container: centered with drop-shadow */
 .container {
+  margin: auto;
+  filter: drop-shadow(0 0 0.75rem rgba(0, 0, 0, 0.2));
 }

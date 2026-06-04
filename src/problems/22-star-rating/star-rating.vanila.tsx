@@ -1,66 +1,75 @@
-import {AbstractComponent, type TComponentConfig} from '@course/utils'
+import { AbstractComponent, type TComponentConfig } from '@course/utils'
 import css from './star-rating.module.css'
 import flex from '@course/styles'
-import cx from "@course/cx";
+import cx from '@course/cx'
 
 const STAR = '⭐️'
 const STARS_COUNT = 5
 
 type TStarRatingProps = {
-    value: number
-    onValueChange?: (value: number) => void
-    readOnly?: boolean
+  value: number
+  onValueChange?: (value: number) => void
+  readOnly?: boolean
 }
 
 export class StarRating extends AbstractComponent<TStarRatingProps> {
-    value: number = 0
+  value: number = 0
 
-    /**
-     * Step 1: Constructor
-     * - Call super() with spread config + className: [css.container] and listeners: ['click']
-     * - Initialize this.value from config.value
-     */
-    constructor(props: TComponentConfig<TStarRatingProps>) {
-    }
+  constructor(props: TComponentConfig<TStarRatingProps>) {
+    super({
+      ...props,
+      className: [css.container, ...(props.className || [])],
+      listeners: ['click'],
+      tag: 'div',
+    })
+    this.value = props.value
+  }
 
-    /**
-     * Step 2: Handle click event
-     * - Return early if this.config.readOnly
-     * - Use (event.target as HTMLElement).closest('button') to find the clicked button
-     * - Read the star value from button.dataset.starValue (convert to Number)
-     * - If valid: update this.value, call this.config.onValueChange, call this.render()
-     */
-    onClick({target}: MouseEvent): void {
-    }
+  onClick(event: MouseEvent): void {
+    if (this.config.readOnly) return
 
-    /**
-     * Step 3: Return HTML template
-     * - Create a stars string by mapping over STARS_COUNT (Array.from({ length: STARS_COUNT }))
-     * - Each star is a <button> with:
-     *     - role="radio"
-     *     - aria-label="Rating of N"
-     *     - aria-selected="${value == this.value}"
-     *     - data-rating="${value}"
-     *     - data-checked="${value <= this.value}"
-     * - Wrap stars in a container <div> with:
-     *     - role="radiogroup"
-     *     - aria-label="Star rating"
-     *     - aria-readonly="${this.config.readOnly ?? false}"
-     * - Include a hidden <input type="hidden" value="${this.value}" aria-hidden="true" />
-     */
-    toHTML(): string {
-    }
+    const button = (event.target as HTMLElement).closest('button')
+    if (!button) return
 
-    getStar = (value: number) => {
+    const starValue = Number(button.dataset.starValue)
+    if (!Number.isNaN(starValue)) {
+      this.value = starValue
+      this.config.onValueChange?.(starValue)
+      this.render()
     }
+  }
 
-    /**
-     * Step 4: Set ARIA attributes on the container after render
-     * - Return early if !this.container
-     * - Set role="radiogroup" on this.container
-     * - Set aria-label="Star Rating" on this.container
-     * - Set aria-readonly to String(this.config.readOnly ?? false) on this.container
-     */
-    afterRender(): void {
-    }
+  toHTML(): string {
+    const readonly = this.config.readOnly ?? false
+
+    const stars = Array.from({ length: STARS_COUNT }, (_, index) => {
+      const starValue = index + 1
+      return `
+        <button
+          type="button"
+          data-star-value="${starValue}"
+          data-active="${this.value >= starValue}"
+          class="${cx(css.star, flex.flexColumnCenter, flex.fontXL)}"
+          role="radio"
+          aria-label="${starValue} Star${starValue === 1 ? '' : 's'}"
+          aria-checked="${this.value === starValue}"
+          aria-readonly="${readonly}"
+          ${readonly ? 'disabled' : ''}
+        ><span>${STAR}</span></button>
+      `
+    }).join('')
+
+    return `
+      <input type="number" value="${this.value}" readonly hidden />
+      <div class="${flex.flexRowCenter}">${stars}</div>
+    `
+  }
+
+  afterRender(): void {
+    if (!this.container) return
+
+    this.container.setAttribute('role', 'radiogroup')
+    this.container.setAttribute('aria-label', 'Star Rating')
+    this.container.setAttribute('aria-readonly', String(this.config.readOnly ?? false))
+  }
 }

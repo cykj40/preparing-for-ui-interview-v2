@@ -17,6 +17,7 @@ import type { Equal, Expect } from '@course/types'
 /* _____________ Your Code Here _____________ */
 
 // Your implementation here
+export type LookUp<U, T> = U extends { type: T } ? U : never
 
 /* _____________ Test Cases _____________ */
 
@@ -33,4 +34,4 @@ interface Dog {
 
 type Animal = Cat | Dog
 
-type cases = [Expect<Equal<LookUp<Animal, 'dog'>, Dog>>, Expect<Equal<LookUp<Animal, 'cat'>, Cat>>]
+export type cases = [Expect<Equal<LookUp<Animal, 'dog'>, Dog>>, Expect<Equal<LookUp<Animal, 'cat'>, Cat>>]

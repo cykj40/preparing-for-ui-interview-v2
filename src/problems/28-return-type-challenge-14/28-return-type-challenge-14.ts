@@ -13,13 +13,13 @@ import type { Equal, Expect } from '@course/types'
 /* _____________ Your Code Here _____________ */
 
 // Your implementation here
-
+export type MyReturnType<T extends (...args: any) => any> = T extends (...args: any) => infer R ? R : never
 /* _____________ Test Cases _____________ */
 
-const fn = (v: boolean) => (v ? 1 : 2)
-const fn1 = (v: boolean, w: any) => (v ? 1 : 2)
+export const fn = (v: boolean) => (v ? 1 : 2)
+export const fn1 = (v: boolean, _: any) => (v ? 1 : 2)
 
-type cases = [
+export type cases = [
   Expect<Equal<string, MyReturnType<() => string>>>,
   Expect<Equal<123, MyReturnType<() => 123>>>,
   Expect<Equal<ComplexObject, MyReturnType<() => ComplexObject>>>,

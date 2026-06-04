@@ -15,11 +15,17 @@ type Falsy = '' | 0 | false | undefined | null | []
 
 /* _____________ Your Code Here _____________ */
 
-type AnyOf = {}
+type IsTruthy<T> = T extends Falsy ? false : keyof T extends never ? false : true
+
+type AnyOf<T extends readonly any[]> = T extends [infer First, ...infer Tail]
+  ? IsTruthy<First> extends true ? true : AnyOf<Tail>
+  : false
+
+
 
 /* _____________ Test Cases _____________ */
 
-type cases = [
+export type cases = [
   Expect<Equal<AnyOf<[1, 'test', true, [1], { name: 'test' }, { 1: 'test' }]>, true>>,
   Expect<Equal<AnyOf<[1, '', false, [], {}]>, true>>,
   Expect<Equal<AnyOf<[0, 'test', false, [], {}]>, true>>,

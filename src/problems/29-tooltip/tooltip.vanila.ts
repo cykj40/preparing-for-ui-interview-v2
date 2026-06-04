@@ -1,4 +1,4 @@
-import {AbstractComponent, type TComponentConfig} from '@course/utils'
+import { AbstractComponent, type TComponentConfig } from '@course/utils'
 import css from './tooltip.module.css'
 import cx from '@course/cx'
 
@@ -13,12 +13,11 @@ type TTooltipProps = {
     boundary?: HTMLElement
 }
 
-const positions: Record<TPositionType, string> = {
+const positions = {
     top: css.top,
     bottom: css.bottom,
     left: css.left,
     right: css.right,
-    auto: ''
 } as const
 
 let id = 0
@@ -32,61 +31,32 @@ let id = 0
 function getAutoPosition(
     tooltip: HTMLElement,
     container: HTMLElement,
-    boundaryElement: HTMLElement,
-): Exclude<TPositionType, 'auto'> {
-    /**
-     *                  ┌───TOP───┐
-     *                  └─────────┘
-     *     ┌──LEFT──┐   ┌─────────┐   ┌──RIGHT──┐
-     *     └────────┘   │CONTAINER│   └─────────┘
-     *                  └─────────┘
-     *                  ┌──BOTTOM─┐
-     *                  └─────────┘
-     */
-    const candidates: TCandidate[] = [
-        {position: 'top', x: 0, y: 0},
-        {position: 'right', x: 0, y: 0},
-        {position: 'bottom', x: 0, y: 0},
-        {position: 'left', x: 0, y: 0},
-    ];
+    boundaryRect: { left: number; top: number; right: number; bottom: number },
+): 'top' | 'bottom' | 'left' | 'right' {
+    const t = tooltip.getBoundingClientRect()
+    const c = container.getBoundingClientRect()
+    const { width: tw, height: th } = t
+    const { left: trL, top: trT, right: trR, bottom: trB } = c
 
-    /**
-     * boundaryRect.left          boundaryRect.right
-     *        ↓                          ↓
-     *        ┌──────────────────────────┐  ← boundaryRect.top
-     *        │                          │
-     *        │                          │
-     *        │      ┌──────────┐        │
-     *        │      │  TOOLTIP │        │
-     *        │      └──────────┘        │
-     *        │                          │
-     *        │                          │
-     *        └──────────────────────────┘  ← boundaryRect.bottom
-     */
-    const fit = ({x, y}: TCandidate) => {
-    }
-    return 'top';
+    const fits = (x: number, y: number) =>
+        x >= boundaryRect.left &&
+        y >= boundaryRect.top &&
+        Math.ceil(x + tw) <= boundaryRect.right &&
+        Math.ceil(y + th) <= boundaryRect.bottom
+
+    const candidates: TCandidate[] = [
+        { position: 'top', x: trL + c.width / 2 - tw / 2, y: trT - th - 8 },
+        { position: 'right', x: trR + 8, y: trT + c.height / 2 - th / 2 },
+        { position: 'bottom', x: trL + c.width / 2 - tw / 2, y: trB + 8 },
+        { position: 'left', x: trL - tw - 8, y: trT + c.height / 2 - th / 2 },
+    ]
+
+    return candidates.find(({ x, y }) => fits(x, y))?.position ?? 'top'
 }
 
-/**
- * Expected input:
- * {
- *   "children": HTMLElement (the trigger element),
- *   "content": "Tooltip text",
- *   "position": "top" | "bottom" | "left" | "right" | "auto",
- *   "boundary": HTMLElement (optional, for auto-positioning)
- * }
- *
- * Step 1: Extend AbstractComponent<TTooltipProps>
- * - Call super() with config, adding:
- *   - className: [css.container]
- *   - listeners: ['mouseenter', 'mouseleave', 'focusin', 'focusout', 'keydown']
- * - Store a unique id and a reference for the tooltip element
- */
 export class Tooltip extends AbstractComponent<TTooltipProps> {
-
-    id = `${id++}`;
-    tooltip: HTMLElement | null = null;
+    id = id++
+    tooltip: HTMLElement | null = null
 
     constructor(config: TComponentConfig<TTooltipProps>) {
         super({
@@ -96,15 +66,12 @@ export class Tooltip extends AbstractComponent<TTooltipProps> {
         })
     }
 
-    /**
-     * Step 2: Implement toHTML
-     * - Return a <div> with role="tooltip", unique id, display:none
-     * - Apply css.tooltip class and position class from positions map
-     * - Content comes from this.config.content
-     * a11y: role="tooltip" on the tooltip element
-     */
     toHTML(): string {
-        return ``;
+        const position = this.config.position ?? 'top'
+        const positionClass =
+            position === 'auto' ? undefined : positions[position as keyof typeof positions]
+
+        return `<div role="tooltip" id="tooltip-${this.id}" style="display: none;" class="${cx(css.tooltip, ...(positionClass ? [positionClass] : []))}">${this.config.content}</div>`
     }
 
     /**
@@ -114,6 +81,9 @@ export class Tooltip extends AbstractComponent<TTooltipProps> {
      * a11y: set aria-describedby on the trigger element pointing to the tooltip id
      */
     afterRender(): void {
+        this.container!.appendChild(this.config.children)
+        this.tooltip = this.container!.querySelector(`#tooltip-${this.id}`)
+        this.config.children.setAttribute('aria-describedby', `tooltip-${this.id}`)
     }
 
     /**
@@ -124,29 +94,48 @@ export class Tooltip extends AbstractComponent<TTooltipProps> {
      * a11y: focusin/focusout ensure keyboard users can trigger tooltip; Escape dismisses it
      */
     onMouseenter() {
+        this.showTooltip()
     }
 
     onMouseleave() {
+        this.hideTooltip()
     }
 
     onFocusin() {
+        this.showTooltip()
     }
 
     onFocusout() {
+        this.hideTooltip()
     }
 
     onKeydown(e: KeyboardEvent) {
+        if (e.key === 'Escape') {
+            this.hideTooltip()
+        }
     }
 
-    /**
-     * Step 5: Implement showTooltip
-     * - Set tooltip display to 'block'
-     * - If position is 'auto': compute best position using getAutoPosition,
-     *   remove all position classes, add the computed one
-     */
     showTooltip() {
+        if (!this.tooltip) return
+
+        this.tooltip.style.display = 'block'
+
+        if (this.config.position === 'auto') {
+            const boundaryRect = this.config.boundary
+                ? this.config.boundary.getBoundingClientRect()
+                : { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }
+
+            const side = getAutoPosition(this.tooltip, this.container!, boundaryRect)
+            for (const classname of Object.values(positions)) {
+                this.tooltip.classList.remove(classname)
+            }
+            this.tooltip.classList.add(positions[side])
+        }
     }
 
     hideTooltip() {
+        if (this.tooltip) {
+            this.tooltip.style.display = 'none'
+        }
     }
 }

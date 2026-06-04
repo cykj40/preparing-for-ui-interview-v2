@@ -14,85 +14,74 @@ export type TTabsProps = {
   tabs: TTabProps[]
 }
 
-/**
- * Expected input:
- * {
- *   "tabs": [
- *     { "name": "Tab 1", "content": "<p>Content for tab 1</p>" },
- *     { "name": "Tab 2", "content": "<p>Content for tab 2</p>" }
- *   ],
- *   "defaultTab": "Tab 1",
- *   "target": HTMLElement (optional, external container for tab content)
- * }
- *
- * Step 1: Extend AbstractComponent<TTabsProps>
- * - Call super() with config, adding listeners: ['click']
- * - Store the default tab name (from config.defaultTab or first tab's name)
- */
 export class Tabs extends AbstractComponent<TTabsProps> {
+  #defaultTab: string
+  #contentContainer: HTMLElement | null = null
+  #activeTabName: string | undefined
+
   constructor(config: TComponentConfig<TTabsProps>) {
     super({
       ...config,
       listeners: ['click'],
     })
+    this.#defaultTab = config.defaultTab ?? config.tabs[0].name
   }
 
-  /**
-   * Step 2: Implement toHTML
-   * - Render a <nav> with a <ul> containing tab buttons (use getTab helper)
-   * - If no external target, render a <section> for the content panel
-   * - Use cx() and flex utilities for layout (flexRowStart, flexGap16)
-   *
-   * ARIA attributes for toHTML:
-   * - <ul>: role="tablist" — identifies the tab control container
-   * - <li>: role="presentation" — removes list item semantics
-   * - <section>: role="tabpanel" — identifies the content area as a tab panel
-   * - <section>: id="tab-panel" — referenced by aria-controls on each tab button
-   * - <section>: aria-labelledby="tab-{defaultTab}" — links panel to the active tab
-   */
   toHTML(): string {
-    // TODO: implement
-    return ``
+    const classes = cx(css.root, flex.w100, ...(this.config.className ?? []))
+    const contentHtml = this.config.target
+      ? ''
+      : `<section role="tabpanel" id="tab-panel" aria-labelledby="tab-${this.#defaultTab}" class="${css.container}"></section>`
+
+    return `
+      <nav class="${classes}">
+        <ul role="tablist" class="${cx(css.tabList, flex.flexRowStart, flex.flexGap16)}">
+          ${this.config.tabs.map((tab) => this.getTab(tab)).join('')}
+        </ul>
+      </nav>
+      ${contentHtml}
+    `
   }
 
-  /**
-   * ARIA attributes for getTab (<button>):
-   * - role="tab" — identifies the button as a tab control
-   * - id="tab-{name}" — unique id linked by aria-labelledby on the panel
-   * - aria-controls="tab-panel" — points to the content panel's id
-   * - aria-selected="false" — indicates whether this tab is active
-   * - data-tab="{name}" — used for click handling (not ARIA)
-   */
   getTab({ name }: TTabProps) {
-    return ``
+    return `<li role="presentation"><button type="button" role="tab" id="tab-${name}" data-tab-name="${name}" aria-controls="tab-panel" aria-selected="false" class="${css.tab}">${name}</button></li>`
   }
 
-  /**
-   * Step 3: Implement afterRender
-   * - If no external target, query the content container from this.container
-   * - Activate the default tab
-   */
   afterRender(): void {
-    // TODO: implement
+    if (!this.config.target) {
+      this.#contentContainer =
+        this.container!.querySelector('#tab-panel') ??
+        this.container!.querySelector(`.${css.container}`)
+    }
+    this.activate(this.#defaultTab)
   }
 
-  /**
-   * Step 4: Implement activate
-   * - Update aria-selected on all tab buttons (true for active, false for others)
-   * - Update the content panel's innerHTML and aria-labelledby="tab-{tabName}"
-   */
-  activate(tab: string) {
-    // TODO: implement
+  activate(tabName: string): void {
+    const tab = this.config.tabs.find((t) => t.name === tabName)
+    if (!tab) return
+
+    const buttons = this.container?.querySelectorAll('[role="tab"]')
+    buttons?.forEach((btn) => {
+      const isActive = (btn as HTMLElement).dataset.tabName === tabName
+      btn.setAttribute('aria-selected', String(isActive))
+    })
+
+    this.#activeTabName = tabName
+
+    const panel = this.config.target ?? this.#contentContainer
+    if (!panel) return
+
+    panel.setAttribute('aria-labelledby', `tab-${tabName}`)
+    panel.innerHTML = tab.content
   }
 
-  /**
-   * Step 5: Implement onClick
-   * - Find the closest <button> from event.target
-   * - Read data-tab attribute
-   * - If tab name changed, activate the new tab
-   */
-  onClick({ target }: MouseEvent): void {
-    // TODO: implement
+  onClick(event: MouseEvent): void {
+    const button = (event.target as HTMLElement).closest('button')
+    if (!button) return
+
+    const tabName = button.dataset.tabName
+    if (tabName && tabName !== this.#activeTabName) {
+      this.activate(tabName)
+    }
   }
 }
-

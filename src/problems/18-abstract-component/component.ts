@@ -13,7 +13,7 @@ export type TComponentConfig<T extends object> = T & {
   tag?: keyof HTMLElementTagNameMap
 }
 
-const DEFAULT_CONFIG: Partial<TComponentConfig<any>> = {
+const DEFAULT_CONFIG: TComponentConfig<any> = {
   className: [],
   listeners: [],
   tag: 'div',
@@ -21,18 +21,15 @@ const DEFAULT_CONFIG: Partial<TComponentConfig<any>> = {
 
 type TComponentListener = { type: string; callback: EventListenerOrEventListenerObject }
 
-/**
- * @param type
- */
 const toEventName = (type: string): string => {
   if (!type) return ''
-  else return `on${type[0].toUpperCase()}${type.slice(1)}`
+  return `on${type[0].toUpperCase()}${type.slice(1)}`
 }
 
 export abstract class AbstractComponent<T extends object> {
-  container: HTMLElement | null
+  container: HTMLElement | null = null
   config: TComponentConfig<T>
-  events: Array<TComponentListener>
+  events: Array<TComponentListener> = []
 
   /**
    * Step 2: Understand constructor
@@ -42,6 +39,10 @@ export abstract class AbstractComponent<T extends object> {
    */
   constructor(config: TComponentConfig<T>) {
     // TODO: implement
+    this.config = { ...DEFAULT_CONFIG, ...config }
+    this.events = []
+    this.container = null
+
   }
 
   /**
@@ -57,9 +58,29 @@ export abstract class AbstractComponent<T extends object> {
    */
   init() {
     // TODO: implement
+    this.container = document.createElement(this.config.tag as keyof HTMLElementTagNameMap)
+    if (this.config.className) {
+      for (const className of this.config.className) {
+        this.container.classList.add(className)
+      }
+    }
+    this.events = (this.config.listeners || []).map((type) => {
+      const event = toEventName(type)
+      // @ts-expect-error dynamic handler lookup on subclass (e.g. onClick)
+      let callback = this[event] as ((e: Event) => void) | undefined
+      if (!callback) {
+        throw Error(`handler ${event} for ${type} is not implemented`)
+      }
+      callback = callback.bind(this)
+      this.container!.addEventListener(type, callback)
+      return { type, callback }
+    })
   }
 
-  afterRender() {}
+  afterRender() {
+    // TODO: implement — hook after DOM attachment (optional override)
+
+  }
 
   /**
    * Step 4: Implement render
@@ -71,6 +92,13 @@ export abstract class AbstractComponent<T extends object> {
    */
   render() {
     // TODO: implement
+    if (this.container) {
+      this.destroy()
+    }
+    this.init()
+    this.container!.innerHTML = this.toHTML()
+    this.config.root.appendChild(this.container!)
+    this.afterRender()
   }
 
   toHTML(): string {
@@ -85,5 +113,10 @@ export abstract class AbstractComponent<T extends object> {
    */
   destroy() {
     // TODO: implement
+    this.events.forEach(({ type, callback }) => {
+      this.container!.removeEventListener(type, callback)
+    })
+    this.events = []
+    this.container!.remove()
   }
 }
