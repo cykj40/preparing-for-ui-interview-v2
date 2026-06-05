@@ -7,51 +7,158 @@ export type TGalleryProps = {
   images: string[]
 }
 
-/**
- * Expected input:
- * {
- *   images: ['url1.jpg', 'url2.jpg', 'url3.jpg']
- * }
- *
- * Step 1: Extend AbstractComponent<TGalleryProps>
- * - Call super() with config, adding:
- *   - className: [styles.container, flex.maxW800px, flex.h600px]
- *   - listeners: ['click']
- * - Store private fields: list (UL), prevBtn, nextBtn, dots (button[]), currentIndex (number)
- * - Bind handleKeyDown and add window 'keydown' listener in init()
- * - Remove the listener in destroy()
- *
- * Step 2: Implement keyboard and click handlers
- * - handleKeyDown: ArrowLeft → handlePrev, ArrowRight → handleNext
- * - onClick: detect prev button, next button, or dot click and call appropriate handler
- * - handlePrev: goToSlide(Math.max(0, currentIndex - 1))
- * - handleNext: goToSlide(Math.min(images.length - 1, currentIndex + 1))
- *
- * Step 3: Implement goToSlide and updateView
- * - goToSlide: set currentIndex, call updateView
- * - updateView:
- *   - Set list transform: translateX(-currentIndex * 100%)
- *   - Update prev/next button disabled states
- *   - Update dot active classes (add/remove styles.dotActive)
- *   - Update img src for lazy loading (currentIndex + 2 >= index)
- *
- * Step 4: Implement afterRender
- * - Query and store DOM refs: list, prevBtn, nextBtn, dots array
- *
- * Step 5: Implement toHTML
- * - Handle empty state: return "No images to display" message
- * - Prev button with styles.buttonPrev, disabled if currentIndex === 0, aria-label="Previous image"
- * - <ul> with styles.list and inline transform style
- * - Each <li> with styles.item containing an <img> (lazy src logic)
- * - Next button with styles.buttonNext, disabled if last image, aria-label="Next image"
- * - Indicators div with dot buttons (styles.dot, styles.dotActive for current), each with aria-label="Go to image {index + 1}"
- */
 export class Gallery extends AbstractComponent<TGalleryProps> {
+  private list: HTMLUListElement | null = null
+  private prevBtn: HTMLButtonElement | null = null
+  private nextBtn: HTMLButtonElement | null = null
+  private dots: HTMLButtonElement[] = []
+  private currentIndex = 0
+
   constructor(config: TComponentConfig<TGalleryProps>) {
-    super(config)
+    super({
+      ...config,
+      className: [styles.container, flex.w100, flex.maxW800px, flex.h600px, flex.pRel],
+      listeners: ['click'],
+    })
+    this.handleKeyDown = this.handleKeyDown.bind(this)
+  }
+
+  init() {
+    super.init()
+    window.addEventListener('keydown', this.handleKeyDown)
+  }
+
+  destroy() {
+    window.removeEventListener('keydown', this.handleKeyDown)
+    super.destroy()
+  }
+
+  handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'ArrowLeft') this.handlePrev()
+    if (e.key === 'ArrowRight') this.handleNext()
+  }
+
+  onClick(event: MouseEvent) {
+    const target = event.target as HTMLElement
+
+    if (target.closest(`.${styles.buttonPrev}`)) {
+      this.handlePrev()
+    } else if (target.closest(`.${styles.buttonNext}`)) {
+      this.handleNext()
+    } else {
+      const dot = target.closest(`.${styles.dot}`)
+      if (dot) {
+        const index = Array.from(dot.parentElement!.children).indexOf(dot)
+        this.goToSlide(index)
+      }
+    }
+  }
+
+  handlePrev() {
+    this.goToSlide(Math.max(0, this.currentIndex - 1))
+  }
+
+  handleNext() {
+    this.goToSlide(Math.min(this.config.images.length - 1, this.currentIndex + 1))
+  }
+
+  goToSlide(index: number) {
+    if (index === this.currentIndex) return
+    this.currentIndex = index
+    this.updateView()
+  }
+
+  updateView() {
+    if (!this.list || !this.prevBtn || !this.nextBtn) return
+
+    this.list.style.transform = `translateX(-${this.currentIndex * 100}%)`
+    this.prevBtn.disabled = this.currentIndex === 0
+    this.nextBtn.disabled = this.currentIndex === this.config.images.length - 1
+
+    this.dots.forEach((dot, index) => {
+      if (index === this.currentIndex) {
+        dot.classList.add(styles.dotActive)
+      } else {
+        dot.classList.remove(styles.dotActive)
+      }
+    })
+
+    const items = this.list.querySelectorAll(`.${styles.item} img`)
+    items.forEach((img, index) => {
+      if (this.currentIndex + 2 >= index) {
+        const src = this.config.images[index]
+        if (img.getAttribute('src') !== src) {
+          img.setAttribute('src', src)
+        }
+      }
+    })
+  }
+
+  afterRender() {
+    super.afterRender()
+    this.list = this.container!.querySelector(`.${styles.list}`)
+    this.prevBtn = this.container!.querySelector(`.${styles.buttonPrev}`)
+    this.nextBtn = this.container!.querySelector(`.${styles.buttonNext}`)
+    this.dots = Array.from(this.container!.querySelectorAll(`.${styles.dot}`))
+    this.updateView()
   }
 
   toHTML(): string {
-    return '<div>TODO: Implement</div>'
+    const { images } = this.config
+
+    if (images.length === 0) {
+      return `<div class="${cx(styles.empty, flex.fontX, flex.flexRowCenter, flex.h100)}">No images to display</div>`
+    }
+
+    return `
+            <button
+                ${this.currentIndex === 0 ? 'disabled' : ''}
+                class="${cx(styles.button, styles.buttonPrev, flex.pAbs, flex.top0, flex.left0, flex.z1, flex.bgBlack4, flex.h100, flex.shadow2, flex.cWhite7, flex.bNone, flex.fontXL)}"
+                aria-label="Previous image"
+            >
+                &lt;
+            </button>
+
+            <ul
+                class="${cx(flex.flexRowStart, flex.h100, styles.list)}"
+                style="transform: translateX(-${this.currentIndex * 100}%)"
+            >
+                ${images
+                  .map(
+                    (image, index) => `
+                    <li class="${cx(flex.wh100, styles.item)}">
+                        <img
+                            class="${flex.wh100}"
+                            src="${this.currentIndex + 2 >= index ? image : ''}"
+                            alt="Gallery image ${index + 1}"
+                        />
+                    </li>
+                `,
+                  )
+                  .join('')}
+            </ul>
+
+            <button
+                ${this.currentIndex === images.length - 1 ? 'disabled' : ''}
+                class="${cx(styles.button, styles.buttonNext, flex.pAbs, flex.top0, flex.right0, flex.z1, flex.bgBlack4, flex.h100, flex.shadow2, flex.cWhite7, flex.bNone, flex.fontXL)}"
+                aria-label="Next image"
+            >
+                &gt;
+            </button>
+
+            <div class="${cx(flex.justifyCenter, flex.flexGap8, flex.pAbs, flex.left0, flex.right0, flex.z1, styles.indicators)}">
+                ${images
+                  .map(
+                    (_, index) => `
+                    <button
+                        type="button"
+                        class="${cx(styles.dot, flex.bgWhite5, flex.br128, this.currentIndex === index ? styles.dotActive : '')}"
+                        aria-label="Go to image ${index + 1}"
+                    ></button>
+                `,
+                  )
+                  .join('')}
+            </div>
+        `
   }
 }

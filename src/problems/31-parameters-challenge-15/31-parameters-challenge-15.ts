@@ -13,15 +13,15 @@ import type { Equal, Expect } from '@course/types'
 
 /* _____________ Your Code Here _____________ */
 
-type MyParameters = {};
+type MyParameters<T extends (...args: any[]) => any> = T extends (...args: infer P) => void ? P : never;
 
 /* _____________ Test Cases _____________ */
 
-function foo(arg1: string, arg2: number): void {}
-function bar(arg1: boolean, arg2: { a: 'A' }): void {}
-function baz(): void {}
+export function foo(_arg1: string, _arg2: number): void { }
+export function bar(_arg1: boolean, _arg2: { a: 'A' }): void { }
+export function baz(): void { }
 
-type cases = [
+export type cases = [
   Expect<Equal<MyParameters<typeof foo>, [string, number]>>,
   Expect<Equal<MyParameters<typeof bar>, [boolean, { a: 'A' }]>>,
   Expect<Equal<MyParameters<typeof baz>, []>>,

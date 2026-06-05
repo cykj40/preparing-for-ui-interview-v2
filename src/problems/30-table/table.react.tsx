@@ -15,6 +15,7 @@ export type TTableColumn<T> = {
   id: string
   name: string
   renderer: (item: T) => React.ReactNode
+  sort?: 'asc' | 'desc' | 'none'
 }
 
 type TTableProps<T extends { id: string }> = {
@@ -37,45 +38,124 @@ export function Table<T extends { id: string }>({
   datasource,
   comparator,
 }: TTableProps<T>) {
-  // Step 1: Set up state
-  // - query (string, default '')
-  // - data (T[], default [])
-  // - currentPage (number, default 0)
-  // - sort ({ columnId, direction } | null, default null)
+  const [query, setQuery] = useState('')
+  const [data, setData] = useState<T[]>([])
+  const [currentPage, setCurrentPage] = useState(0)
+  const [sort, setSort] = useState<TSort<T> | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Step 2: Fetch initial data
-  // - useEffect on datasource change: reset data and currentPage, fetch page 0
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+    setCurrentPage(0)
+    setData([])
 
-  // Step 3: Implement pagination handlers
-  // - next: if not on last page, increment currentPage; if data not yet fetched, call datasource.next and append
-  // - prev: decrement currentPage (min 0)
-  const next = () => {}
-  const prev = () => {}
+    datasource.next(0, datasource.pageSize).then((newData) => {
+      if (cancelled) return
+      setData(newData)
+      setIsLoading(false)
+    })
 
-  // Step 4: Implement search handler
-  const searchHandler = (data: T[], query: string): T[] => {
-    return []
+    return () => {
+      cancelled = true
+    }
+  }, [datasource])
+
+  const next = async () => {
+    if (isLoading || currentPage >= datasource.pages - 1) return
+    const nextPage = currentPage + 1
+
+    if (data.length < (nextPage + 1) * datasource.pageSize) {
+      setIsLoading(true)
+      try {
+        const newData = await datasource.next(nextPage, datasource.pageSize)
+        setData((prev) => [...prev, ...newData])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    setCurrentPage(nextPage)
   }
 
-  // Step 5: Implement sort handler
-  // - onSort: read data-column-id from clicked th element
-  // - Cycle direction: none → asc → desc → none
-  // - Update sort state
-  const onSort: React.MouseEventHandler<HTMLElement> = ({ target }) => {
-    // todo
+  const prev = () => setCurrentPage((p) => Math.max(p - 1, 0))
+
+  const onSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value)
+    setCurrentPage(0)
   }
 
-  // Step 6: Compute displayed slice with useMemo
-  // - Filter data using search prop (or fallback to id.includes)
-  // - Sort filtered data using comparator prop if sort is active
-  // - Slice to current page window
+  const onSort: React.MouseEventHandler<HTMLTableSectionElement> = ({ target }) => {
+    if (!(target instanceof HTMLElement) || !target.dataset.columnId) return
+    const columnId = target.dataset.columnId as keyof T
+    const column = columns.find((c) => c.id === columnId)
+    if (!column) return
+    setSort((prev) => {
+      const dir = prev?.id === columnId ? prev.dir : (column.sort ?? 'none')
+      return { id: columnId, dir: nextDir[dir] }
+    })
+  }
 
-  const compute = (): T[] => {}
+  const slice = useMemo(() => {
+    const filtered = query
+      ? search
+        ? search(query, data)
+        : data.filter((item) => item.id.includes(query))
+      : data
+    const sorted =
+      sort && comparator && sort.dir !== 'none'
+        ? [...filtered].sort(comparator(sort.id as keyof T, sort.dir))
+        : filtered
+    const start = currentPage * datasource.pageSize
+    return sorted.slice(start, start + datasource.pageSize)
+  }, [data, query, search, sort, comparator, currentPage, datasource])
 
-  // Step 7: Render
-  // - <table> with <thead> (column headers with sort indicators and data-column-id)
-  // - <tbody> with rows from slice, using column renderers
-  // - Controls: Prev/Next buttons (disabled at boundaries), page info, search input
-
-  return <div>TODO: Implement</div>
+  return (
+    <div className={cx(flex.w100, flex.flexColumnStart)}>
+      <div className={styles.table}>
+        <table>
+          <thead onClickCapture={onSort}>
+            <tr>
+              {columns.map((c) => {
+                const currentSort = sort?.id === c.id ? sort.dir : c.sort
+                return (
+                  <th data-column-id={c.id} key={c.id} style={{ cursor: 'pointer' }}>
+                    {c.name}
+                    {currentSort === 'asc' ? ' ↑' : currentSort === 'desc' ? ' ↓' : ''}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map((item) => (
+              <tr key={item.id}>
+                {columns.map((col) => (
+                  <td key={col.id}>{col.renderer(item)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className={cx(flex.flexRowCenter, flex.flexGap8, styles.controls)}>
+        <button type="button" disabled={isLoading || currentPage === 0} onClick={prev}>
+          Prev
+        </button>
+        <span>
+          {currentPage + 1} / {datasource.pages}
+        </span>
+        <button
+          type="button"
+          disabled={isLoading || currentPage >= datasource.pages - 1}
+          onClick={() => void next()}
+        >
+          Next
+        </button>
+        <input type="search" placeholder="Filter" value={query} onChange={onSearch} />
+      </div>
+    </div>
+  )
 }
+
+export default Table

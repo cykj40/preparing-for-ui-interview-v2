@@ -15,7 +15,7 @@ import type { Equal, Expect } from '@course/types'
 
 /* _____________ Your Code Here _____________ */
 
-type MyAwaited<T> = {};
+type MyAwaited<T> = T extends { then: (onfulfilled: (arg: infer V) => any) => any } ? MyAwaited<V> : T;
 
 /* _____________ Test Cases _____________ */
 
@@ -25,7 +25,7 @@ type Z = Promise<Promise<string | number>>
 type Z1 = Promise<Promise<Promise<string | boolean>>>
 type T = { then: (onfulfilled: (arg: number) => any) => any }
 
-type cases = [
+export type cases = [
   Expect<Equal<MyAwaited<X>, string>>,
   Expect<Equal<MyAwaited<Y>, { field: number }>>,
   Expect<Equal<MyAwaited<Z>, string | number>>,
