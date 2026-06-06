@@ -27,6 +27,6 @@ export class Calculator extends AbstractComponent<{}> {
     super(config)
   }
   toHTML() {
-    return '<div>TODO: Implement Calculator</div>'
+    return '<div></div>'
   }
 }

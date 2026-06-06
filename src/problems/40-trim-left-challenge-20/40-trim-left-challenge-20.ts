@@ -12,10 +12,12 @@ import type { Equal, Expect } from '@course/types'
 /* _____________ Your Code Here _____________ */
 
 // Your implementation here
+type Space = ' ' | '\t' | '\n'
+type TrimLeft<S extends string> = S extends `${Space}${infer T}` ? TrimLeft<T> : S;
 
 /* _____________ Test Cases _____________ */
 
-type cases = [
+export type cases = [
   Expect<Equal<TrimLeft<'str'>, 'str'>>,
   Expect<Equal<TrimLeft<' str'>, 'str'>>,
   Expect<Equal<TrimLeft<'     str'>, 'str'>>,

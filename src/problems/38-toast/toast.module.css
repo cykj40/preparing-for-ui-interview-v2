@@ -20,3 +20,40 @@
 .fadeOut {
     animation: toastFadeOut 550ms ease-in forwards;
 }
+
+@keyframes toastFadeIn {
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+    max-height: 0px;
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+
+  100% {
+    max-height: 1000px;
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+@keyframes toastFadeOut {
+  0% {
+    transform: translateY(0px);
+    opacity: 1;
+    max-height: 1000px;
+  }
+
+  100% {
+    transform: translateY(-10px);
+    opacity: 0;
+    max-height: 0px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: none;
+  }
+}
