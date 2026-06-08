@@ -33,9 +33,32 @@ type TPortfolioVisualizerProps = {
 //     - <summary> containing a row with <strong>name</strong> and a group of:
 //       - <input type="number" data-node-id={id} defaultValue={value}>
 //       - <output> showing percentage%
-//   - Recursively render children, passing the same total to each child
+//   - Recursively render children, passing the same total to each childtion
+
+function PortfolioNode({ id, name, value, children, total }: TPortfolioNode & { total: number }) {
+  const percentage = Math.round((value / total) * 100).toFixed(2);
+
+  return <details open={true}>
+    <summary className={cx(styles.padding8)}>
+      <strong>{name}</strong>
+      <div className={cx(styles.flexRowBetween, styles.flexRowGap8)}>
+        <input type="text" data-node-id={id} defaultValue={value} />
+        <output>{percentage}%</output>
+      </div>
+
+    </summary>
+    <ul className={cx(styles.paddingLeft16, styles.paddingVer8, css.listUl)}>
+      {children?.map((child) => (
+        <li key={child.id}>
+          <PortfolioNode {...child} total={total} />
+        </li>
+      ))}
+    </ul>
+
+  </details>
+}
 
 export function PortfolioVisualizer({ data }: TPortfolioVisualizerProps) {
   // Step 2: Render — container div, render root PortfolioNode with total={data.value}
-  return <div>TODO: Implement</div>
+  return <PortfolioNode {...data} total={data.value} />
 }
