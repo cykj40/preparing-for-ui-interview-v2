@@ -23,7 +23,12 @@ export class TableEngine {
     // Step 4 - Tie it together
     // Call #compile to get deps, then call setDeps to update the graph.
     // Return { changed: [id] }
-    throw new Error('TODO: compile and track dependencies')
+
+    const nextDeps = this.#compile(id, raw)
+    this.setDeps(id, nextDeps)
+    return { changed: [id] }
+
+
   }
 
   getRaw(id: CellId): string {
@@ -62,7 +67,14 @@ export class TableEngine {
    * 4. Update #deps map with nextDeps
    */
   setDeps(id: CellId, nextDeps: Set<CellId>) {
-    throw new Error('TODO: Update dependency and reverse dependency maps')
+    const prevDeps = this.getDeps(id)
+    for (const oldDep of prevDeps) {
+      if (!nextDeps.has(oldDep)) this.getRevDeps(oldDep).delete(id)
+    }
+    for (const newDep of nextDeps) {
+      if (!prevDeps.has(newDep)) this.getRevDeps(newDep).add(id)
+    }
+    this.#deps.set(id, nextDeps)
   }
 
   /* Step 1–2 - Compile
@@ -72,9 +84,32 @@ export class TableEngine {
    * - On success: extract 'ref' tokens as deps, store { rpn }, return deps set.
    */
   #compile(id: CellId, raw: string): Set<CellId> {
-    throw new Error('TODO: Use tokenize and toRpn to compile expression into RPN tokens')
-  }
+    const deps = new Set<CellId>()
+    raw = raw.trim()
+    if (!raw.startsWith('=')) {
+      this.#compiled.set(id, null)
+      return deps
+    }
+    const expr = raw.slice(1).trim()
+    const tokens = tokenize(expr)
+    if (!tokens.ok) {
+      this.#compiled.set(id, { error: tokens.error })
+      return deps
+    }
+    const rpn = toRpn(tokens.tokens)
+    if (!rpn.ok) {
+      this.#compiled.set(id, { error: rpn.error })
+      return deps
+    }
 
+    for (const t of rpn.rpn) {
+      if (t.t === 'ref') deps.add(t.id)
+    }
+
+    this.#compiled.set(id, { rpn: rpn.rpn })
+    return deps
+  }
+  
   /* Exposed for testing */
   _getCompiled(id: CellId): Compiled | undefined {
     return this.#compiled.get(id)

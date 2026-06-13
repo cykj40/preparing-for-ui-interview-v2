@@ -1,6 +1,6 @@
 // bun test src/problems/59-google-sheet-topo/test/table-engine.test.ts
 
-// @ts-ignore
+// @ts-strict-ignore
 import { tokenize, toRpn, type CellId, type Compiled } from '../../utilities/google-sheet-parser'
 
 export type { CellId } from '../../utilities/google-sheet-parser'
@@ -92,28 +92,67 @@ export class TableEngine {
     return deps
   }
 
-  _affectedFrom(_start: CellId): Set<CellId> {
-    // TODO: Step 1 - Find Affected Nodes
-    // 1. Maintain an `affected` Set to track visited nodes.
-    // 2. Using a `queue` array, push the start cell onto it.
-    // 3. Iteratively loop: push every cell's `getRevDeps()` onto the backlog until all downstream nodes are exhausted.
-    // 4. Return the `affected` set.
-    throw new Error('TODO: Collect all nodes transitively affected via reverse deps')
+  _affectedFrom(start: CellId): Set<CellId> {
+    const affected = new Set<CellId>()
+    const queue: CellId[] = [start]
+
+    for (let i = 0; i < queue.length; i++) {
+      const id = queue[i]!
+      if (affected.has(id)) continue
+      affected.add(id)
+      for (const dep of this.getRevDeps(id)) queue.push(dep)
+    }
+
+    return affected
   }
 
-  _topoSort(_affected: Set<CellId>): { order: CellId[]; cyclic: Set<CellId> } {
-    // TODO: Step 2 - Kahn's Algorithm
-    // 1. Calculate initial weights: Iterate through `affected`. For each of its `getDeps()`, increment its in-degree count ONLY IF the dependency is ALSO inside the `affected` set.
-    // 2. Cull the queue: Push all cells with an in-degree of 0 into a processing `queue`.
-    // 3. Process ordering: Iterate through the processing `queue` (adding them to the final `order`).
-    // 4. As you process a node, decrement the in-degree score of all its `getRevDeps()`. If a descending node falls to an in-degree of 0, immediately push it onto the processing `queue`!
-    // 5. Cycle Detection: Any cells from `affected` that didn't make it into your final `order` are caught in a circular reference! Return both!
-    throw new Error('TODO: Create TopoSort queue using Kahns algorithm')
+  #topoSort(affected: Set<CellId>): { order: CellId[]; cyclic: Set<CellId> } {
+    const inDegree = new Map<CellId, number>()
+
+    for (const id of affected) {
+      let deg = 0
+      for (const dep of this.getDeps(id)) {
+        if (affected.has(dep)) deg++
+      }
+      inDegree.set(id, deg)
+    }
+
+    const queue: CellId[] = []
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) queue.push(id)
+    }
+
+    const order: CellId[] = []
+    for (let i = 0; i < queue.length; i++) {
+      const id = queue[i]!
+      order.push(id)
+
+      for (const dependent of this.getRevDeps(id)) {
+        if (!affected.has(dependent)) continue
+        const next = (inDegree.get(dependent) ?? 0) - 1
+        inDegree.set(dependent, next)
+        if (next === 0) queue.push(dependent)
+      }
+    }
+
+    const cyclic = new Set<CellId>()
+    if (order.length !== affected.size) {
+      const inOrder = new Set(order)
+      for (const id of affected) {
+        if (!inOrder.has(id)) cyclic.add(id)
+      }
+    }
+
+    return { order, cyclic }
+  }
+
+  _topoSort(start: CellId): { order: CellId[]; cyclic: Set<CellId> } {
+    return this.#topoSort(this._affectedFrom(start))
   }
 
   #recomputeFrom(start: CellId): CellId[] {
     const affected = this._affectedFrom(start)
-    const { order, cyclic } = this._topoSort(affected)
+    const { order, cyclic } = this.#topoSort(affected)
 
     const changed: CellId[] = []
     for (const id of cyclic) changed.push(id)
@@ -126,17 +165,17 @@ export class TableEngine {
 }
 
 // ── Uncomment below to test your implementation ─────────────────────
-// const engine = new TableEngine()
+const engine = new TableEngine()
 //
 // // Build a dependency chain: A1 → B1 → C1
-// engine.setRaw('A1', '10')
-// engine.setRaw('B1', '=A1*2')
-// engine.setRaw('C1', '=B1+5')
+engine.setRaw('A1', '10')
+engine.setRaw('B1', '=A1*2')
+engine.setRaw('C1', '=B1+5')
 //
 // // Test _affectedFrom — changing A1 should affect A1, B1, C1
-// console.log('affected from A1:', engine._affectedFrom('A1'))  // Set { "A1", "B1", "C1" }
-// console.log('affected from B1:', engine._affectedFrom('B1'))  // Set { "B1", "C1" }
-// console.log('affected from C1:', engine._affectedFrom('C1'))  // Set { "C1" }
+console.log('affected from A1:', engine._affectedFrom('A1'))  // Set { "A1", "B1", "C1" }
+console.log('affected from B1:', engine._affectedFrom('B1'))  // Set { "B1", "C1" }
+console.log('affected from C1:', engine._affectedFrom('C1'))  // Set { "C1" }
 //
 // // Test _topoSort — should produce valid evaluation order
 // const affected = engine._affectedFrom('A1')
