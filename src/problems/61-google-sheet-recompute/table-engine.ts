@@ -167,16 +167,25 @@ export class TableEngine {
 
   #recomputeFrom(_start: CellId): CellId[] {
     // TODO: Step 1 - Recomputation Pipeline
+    const affected = this._affectedFrom(_start);
+    const { order, cyclic } = this._topoSort(affected);
+
     // 1. Pass the edited `start` cell `id` into `#affectedFrom`.
     // 2. Pass that output into `#topoSort`.
     // 3. Create a `changed` array.
-    // 4. Iterate over the `cyclic` array outputted from your Topo sort, and force update
-    //    their `engine.#value` maps to `#CYCLE!`. Push them to `changed`.
-    // 5. Iterate over the chronological `order` timeline outputted from your Topo sort.
-    //    Ensure the cell is not in the circular array, then run `this.#evalCell()` on it!
-    //    Update its `engine.#value` to whatever the AST computed. Push to `changed`!
-    // 6. Return the `changed` array!
-    throw new Error('TODO: Combine affectedFrom, topoSort, and evalCell into recompute pipeline!')
+    for (const cell of cyclic) {
+      this.#val.set(cell, _CYCLE);
+    }
+
+    for (const cell of order) {
+      if (cyclic.has(cell)) {
+        this.#val.set(cell, this._evalCell(cell));
+      }
+
+    }
+    const orderedSet = new Set<CellId>(order);
+    const changed = orderedSet.union(cyclic) as Set<CellId>;
+    return Array.from(changed);
   }
 }
 

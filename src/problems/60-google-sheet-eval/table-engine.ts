@@ -1,6 +1,6 @@
 // bun test src/problems/60-google-sheet-eval/test/table-engine.test.ts
 
-// @ts-ignore
+// @ts-strict-ignore
 import {
   CYCLE as _CYCLE,
   ERROR as _ERROR,
@@ -28,7 +28,7 @@ export class TableEngine {
 
     // TODO: Update the value by evaluating the cell directly.
     // Replace this placeholder with: `this._evalCell(id)`
-    this.#val.set(id, raw)
+    this.#val.set(id, this._evalCell(id));
 
     const changed = [id]
     return { changed }
@@ -107,9 +107,19 @@ export class TableEngine {
   _evalCell(_id: CellId): string {
     // TODO: Step 1 - Build the Evaluation Pipeline
     // 1. Fetch `#raw` text. If it doesn't start with `=`, just return the raw text.
-    // 2. Fetch the `#compiled` properties for this cell. If it failed to compile, it contains an `{ error }` — return ERROR.
-    // 3. Run `evalRpn(compiled.rpn, (refId) => this.getValue(refId))` to evaluate the formula.
-    throw new Error('TODO: Evaluate cell using evalRpn with getValue as the lookup callback')
+    const raw = this.getRaw(_id);
+    if (!raw.startsWith('=')) return raw;
+    const compiled = this.#compiled.get(_id);
+
+    if (compiled == null) return '';
+
+    if ('error' in compiled) return _ERROR;
+
+    const { rpn } = compiled;
+    const value = _evalRpn(rpn, (refId) => this.getValue(refId))
+
+    return value;
+
   }
 
   // We are copying Topo into the class early here, preparing for 19.5
@@ -169,12 +179,12 @@ export class TableEngine {
 }
 
 // ── Uncomment below to test your implementation ─────────────────────
-// const engine = new TableEngine()
+const engine = new TableEngine()
 //
 // // Basic values
-// engine.setRaw('A1', '10')
-// engine.setRaw('B1', '20')
-// console.log('A1 value:', engine.getValue('A1'))  // "10"
+engine.setRaw('A1', '10')
+engine.setRaw('B1', '20')
+console.log('A1 value:', engine.getValue('A1'))  // "10"
 //
 // // Formula evaluation — should compute the result
 // engine.setRaw('C1', '=A1+B1')

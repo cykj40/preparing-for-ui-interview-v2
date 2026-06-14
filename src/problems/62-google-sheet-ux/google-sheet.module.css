@@ -1,5 +1,8 @@
 /* Student solution styles */
-.grid {}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(27, 1fr);
+}
 
 .grid__cell {
     box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.2);

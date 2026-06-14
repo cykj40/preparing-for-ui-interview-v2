@@ -1,4 +1,4 @@
-import {type CellId, TableEngine} from "../61-google-sheet-recompute/solution/table-engine.ts";
+import { type CellId, TableEngine } from "../61-google-sheet-recompute/solution/table-engine.ts";
 import css from "./google-sheet.module.css";
 import cx from "@course/cx";
 
@@ -36,7 +36,7 @@ export type TTableColumn = (typeof COLS)[number]
 export function fromCellReference(id: CellId): { row: number; col: string } {
     const col = id[0] as string
     const row = Number(id.slice(1))
-    return {row, col}
+    return { row, col }
 }
 
 export function toCellReference(row: number, col: TTableColumn): CellId {
@@ -123,7 +123,19 @@ const resizeClass = {
      contentEditable={role === 'gridcell'}, suppressContentEditableWarning
    - Children: {value}
 */
-function Cell({column, row, value}: TCellProps) {
+function Cell({ column, row, value }: TCellProps) {
+    let role: 'columnheader' | 'rowheader' | 'gridcell';
+
+    if (row === 0) {
+        role = 'columnheader';
+    } else if (column === EMPTY) {
+        role = 'rowheader';
+    } else {
+        role = 'gridcell';
+    }
+    const classname = role === 'gridcell' ? css.grid__cell : css.grid__header;
+    const resizeClassname = resizeClass[role];
+    return <div suppressContentEditableWarning={true} contentEditable={true} className={cx(classname, resizeClassname)} role={role} data-row={row} data-column={column}>{value}</div>
 }
 
 /* Step 2: HEADER_ROWS — map TABLE_COLUMNS to <Cell> with row=0
@@ -131,8 +143,10 @@ function Cell({column, row, value}: TCellProps) {
    - For letter columns: value is the column letter
 */
 const HEADER_ROWS = (
-    <div role="row" style={{display: 'contents'}}>
-        {TABLE_COLUMNS}
+    <div role="row" style={{ display: 'contents' }}>
+        {TABLE_COLUMNS.map((col, coli) => {
+            return <Cell row={0} column={col} value={col === EMPTY ? '' : String(col)} />
+        })}
     </div>
 )
 
@@ -140,11 +154,18 @@ const HEADER_ROWS = (
    - For EMPTY column: value is the row number (rowId)
    - For letter columns: value is null (empty editable cell)
 */
-const BODY_ROWS = Array.from({length: MAX_ROWS}).map((_, idx) => {
+const BODY_ROWS = Array.from({ length: MAX_ROWS }).map((_, idx) => {
     const rowId = idx + 1
     return (
-        <div role="row" key={idx} style={{display: 'contents'}}>
-            {TABLE_COLUMNS}
+        <div role="row" key={idx} style={{ display: 'contents' }}>
+            {TABLE_COLUMNS.map((col) => (
+                <Cell
+                    key={String(col) + idx}
+                    column={col}
+                    row={rowId}
+                    value={col === EMPTY ? rowId : ''}
+                />
+            ))}
         </div>
     )
 })
@@ -163,7 +184,7 @@ export function GoogleSheet() {
        - Build the CellId with toCellReference
        - Set target.textContent = engine.getRaw(id)
     */
-    const handleCellFocus: React.FocusEventHandler<HTMLDivElement> = ({target}) => {
+    const handleCellFocus: React.FocusEventHandler<HTMLDivElement> = ({ target }) => {
     }
     /* Step 6: handeCellChange — when a cell loses focus (blur), commit the edit
        - Read column and row from target.dataset, build CellId
@@ -172,7 +193,7 @@ export function GoogleSheet() {
        - Set target.textContent = engine.getValue(id) to show computed value
        - Loop through changed set and call updateCellView for each affected cell
     */
-    const handeCellChange: React.FocusEventHandler<HTMLDivElement> = ({target}) => {
+    const handeCellChange: React.FocusEventHandler<HTMLDivElement> = ({ target }) => {
     }
 
     return (
