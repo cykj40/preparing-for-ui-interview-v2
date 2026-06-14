@@ -144,7 +144,7 @@ function Cell({ column, row, value }: TCellProps) {
 */
 const HEADER_ROWS = (
     <div role="row" style={{ display: 'contents' }}>
-        {TABLE_COLUMNS.map((col, coli) => {
+        {TABLE_COLUMNS.map((col) => {
             return <Cell row={0} column={col} value={col === EMPTY ? '' : String(col)} />
         })}
     </div>
@@ -178,6 +178,17 @@ export function GoogleSheet() {
        - Otherwise: show computed value via engine.getValue(id)
     */
     const updateCellView = (id: CellId) => {
+        const { row, col } = fromCellReference(id);
+        const element = getCellElement(row, col);
+        if (!element) return
+        if (document.activeElement === element) {
+            const raw = engine.getRaw(id);
+            element.textContent = raw;
+        } else {
+            const value = engine.getValue(id);
+            element.textContent = String(value);
+        }
+
     }
     /* Step 5: handleCellFocus — when a cell gains focus, show its raw formula
        - Read column and row from target.dataset
@@ -185,15 +196,26 @@ export function GoogleSheet() {
        - Set target.textContent = engine.getRaw(id)
     */
     const handleCellFocus: React.FocusEventHandler<HTMLDivElement> = ({ target }) => {
+        if (target instanceof HTMLElement && target.dataset.row && target.dataset.column) {
+            const row = Number(target.dataset.row)
+            const col = target.dataset.column as TTableColumn
+            const id = toCellReference(row, col)
+            target.textContent = engine.getRaw(id)
+        }
     }
-    /* Step 6: handeCellChange — when a cell loses focus (blur), commit the edit
-       - Read column and row from target.dataset, build CellId
-       - Get the raw text from target.textContent
-       - Call engine.setRaw(id, raw) — returns { changed: Set<CellId> }
-       - Set target.textContent = engine.getValue(id) to show computed value
-       - Loop through changed set and call updateCellView for each affected cell
-    */
+
     const handeCellChange: React.FocusEventHandler<HTMLDivElement> = ({ target }) => {
+        if (target instanceof HTMLElement && target.dataset.row && target.dataset.column) {
+            const row = Number(target.dataset.row)
+            const col = target.dataset.column as TTableColumn
+            const id = toCellReference(row, col)
+            const raw = target.textContent ?? ''
+            const { changed } = engine.setRaw(id, raw)
+            target.textContent = engine.getValue(id)
+            for (const cell of changed) {
+                updateCellView(cell)
+            }
+        }
     }
 
     return (
